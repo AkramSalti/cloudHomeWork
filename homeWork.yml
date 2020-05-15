@@ -46,7 +46,7 @@ parameters:
   private_net_pool_end:
     type: string
     description: End of private network IP address allocation pool
-    default: 10.0.10.50
+    default: 10.10.10.255
 
   db_name:
     type: string

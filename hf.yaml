@@ -157,7 +157,7 @@ resources:
   dbServerPort:
     type: OS::Neutron::Port
     properties:
-        network_id: {get_param: private_net_name}
+        network_id: {get_resource: private_net}
         fixed_ips:
           - subnet_id: {get_resource: private_subnet}
         security_groups: [{get_resource: db_security_group}]
@@ -194,7 +194,7 @@ resources:
   WebServerPort:
     type: OS::Neutron::Port
     properties:
-        network_id: {get_resource: private_net_name}
+        network_id: {get_resource: private_net}
         fixed_ips:
           - subnet_id: {get_resource: private_subnet}
         security_groups: [{get_resource: web_security_group}]

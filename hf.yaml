@@ -208,6 +208,7 @@ resources:
   db_security_group:
     type: OS::Neutron::SecurityGroup
     properties:
+      name: db_security_group
       description: Add security group rules for database
       rules:
         - {port_range_max: 3306, port_range_min: 3306, protocol: tcp}
@@ -215,6 +216,7 @@ resources:
   web_security_group:
     type: OS::Neutron::SecurityGroup
     properties:
+      name: web_security_group
       description: Add security group rules for web server
       rules:
         - {port_range_max: 80, port_range_min: 80, protocol: tcp, remote_ip_prefix: 0.0.0.0/0}

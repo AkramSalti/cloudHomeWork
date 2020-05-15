@@ -30,7 +30,8 @@ parameters:
 
   private_net_name:
     type: string
-    description: name of the private network to be createda
+    description: name of the private network to be created
+    default: private-net
   
   private_net_cidr:
     type: string

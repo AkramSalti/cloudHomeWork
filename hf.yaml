@@ -159,7 +159,7 @@ resources:
     properties:
         network_id: {get_param: private_net_name}
         fixed_ips:
-          - subnet_id: { get_resource:private_subnet}
+          - subnet_id: { get_resource: private_subnet}
         security_groups: [{get_resource: db_security_group}]
 
   WebServer:

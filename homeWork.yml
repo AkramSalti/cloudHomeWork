@@ -15,7 +15,7 @@ parameters:
     description: name of image to use for servers
     default: fedora-20.x86_64
 
-  flavor:
+  instance_type:
     type: string
     description: Instance type for web and DB servers
     default: m1.small
@@ -31,22 +31,12 @@ parameters:
   private_net_name:
     type: string
     description: name of the private network to be created 
-    default: private-net
+    default: private
   
   private_net_cidr:
     type: string
     description: Private network address (CIDR notation)
     default: 10.10.10.0/24
-    
-  private_net_pool_start:
-    type: string
-    description: Start of private network IP address allocation pool
-    default: 10.10.10.2
-    
-  private_net_pool_end:
-    type: string
-    description: End of private network IP address allocation pool
-    default: 10.10.10.255
 
   db_name:
     type: string
@@ -93,6 +83,12 @@ parameters:
       - allowed_pattern: '[a-zA-Z0-9]*'
         description: db_root_password must contain only alphanumeric characters
         
+  dns: 
+    default: 8.8.8.8
+    description: Comma separated list of DNS nameservers forthe private network
+    label: DNS nameservers
+    type: comma_delimited_list
+        
 resources:
 
   private_net:
@@ -105,10 +101,7 @@ resources:
     properties:
       network_id: { get_resource: private_net }
       cidr: { get_param: private_net_cidr }
-      dns_nameservers: ["8.8.8.8"]
-      allocation_pools:
-        - start: { get_param: private_net_pool_start }
-          end: { get_param: private_net_pool_end }
+      dns_nameservers: {get_param: dns}
           
   router:
     type: OS::Neutron::Router
@@ -126,28 +119,46 @@ resources:
     type: OS::Nova::Server
     properties:
       image: { get_param: image_id }
-      flavor: { get_param: flavor }
+      flavor: { get_param: instance_type }
       key_name: { get_param: key_name }
       networks:
         - port : {get_resource: dbServerPort}
       user_data:
         str_replace:
-          template: |
-            #!/bin/bash -v
+          template: '#!/bin/bash -v
+
+
             sed -i "s/metalink=https/metalink=http/" /etc/yum.repos.d/*
+
+
             yum -y install mariadb mariadb-server
+
             touch /var/log/mariadb/mariadb.log
+
             chown mysql.mysql /var/log/mariadb/mariadb.log
+
             systemctl start mariadb.service
+
+
             # Setup MySQL root password and create a user
+
             mysqladmin -u root password db_rootpassword
+
             cat << EOF | mysql -u root --password=db_rootpassword
+
             CREATE DATABASE db_name;
+
             GRANT ALL PRIVILEGES ON db_name.* TO "db_user"@"%"
+
             IDENTIFIED BY "db_password";
+
             FLUSH PRIVILEGES;
+
             EXIT
+
             EOF
+
+            '
           params:
             db_rootpassword: { get_param: db_root_password }
             db_name: { get_param: db_name }
@@ -166,24 +177,38 @@ resources:
     type: OS::Nova::Server
     properties: 
       image: { get_param: image_id }
-      flavor: { get_param: flavor }
+      flavor: { get_param: instance_type }
       key_name: { get_param: key_name }
       networks:
         - port : { get_resource: WebServerPort}
       user_data:
         str_replace:
-          template: |
-            #!/bin/bash -v
+          template: '#!/bin/bash -v
+
+
             sed -i "s/metalink=https/metalink=http/" /etc/yum.repos.d/*
+
+
             yum -y install httpd wordpress
+
+
             sed -i "/Deny from All/d" /etc/httpd/conf.d/wordpress.conf
+
             sed -i "s/Require local/Require all granted/" /etc/httpd/conf.d/wordpress.conf
+
             sed -i s/database_name_here/db_name/ /etc/wordpress/wp-config.php
+
             sed -i s/username_here/db_user/      /etc/wordpress/wp-config.php
+
             sed -i s/password_here/db_password/  /etc/wordpress/wp-config.php
+
             sed -i s/localhost/db_ipaddr/        /etc/wordpress/wp-config.php
+
             setenforce 0 # Otherwise net traffic with DB is disabled
+
             systemctl start httpd.service
+
+            '
           params:
             db_rootpassword: { get_param: db_root_password }
             db_name: { get_param: db_name }
@@ -202,7 +227,7 @@ resources:
   server_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
-      floating_network_id: {get_param: public_net_name}
+      floating_network: {get_param: public_net_name}
       port_id: {get_resource: WebServerPort}
       
   db_security_group:
@@ -221,12 +246,14 @@ resources:
       rules:
         - {port_range_max: 80, port_range_min: 80, protocol: tcp, remote_ip_prefix: 0.0.0.0/0}
         - {port_range_max: 22, port_range_min: 22, protocol: tcp, remote_ip_prefix: 0.0.0.0/0}
+        - {protocol: icmp, remote_ip_prefix: 0.0.0.0/0}
       
 outputs:
   WebsiteURL:
     description: URL for Wordpress wiki
     value:
       str_replace:
-        template: http://host/wordpress
         params:
-          host: { get_attr: [WebServer, networks, private, 0] }
+          host:
+            get_attr: [WebServer, networks, private, 0]
+        template: http://host/wordpress

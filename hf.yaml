@@ -36,12 +36,12 @@ parameters:
   private_net_cidr:
     type: string
     description: Private network address (CIDR notation)
-    default: 10.10.10.0/24
+    default: 10.0.10.0/24
     
   private_net_pool_start:
     type: string
     description: Start of private network IP address allocation pool
-    default: 10.10.10.2
+    default: 10.0.10.2
     
   private_net_pool_end:
     type: string
@@ -132,8 +132,7 @@ resources:
         - port : {get_resource: dbServerPort}
       user_data:
         str_replace:
-          template: |
-            #!/bin/bash -v
+          template: '#!/bin/bash -v
             sed -i "s/metalink=https/metalink=http/" /etc/yum.repos.d/*
             yum -y install mariadb mariadb-server
             touch /var/log/mariadb/mariadb.log
@@ -148,6 +147,7 @@ resources:
             FLUSH PRIVILEGES;
             EXIT
             EOF
+            '
           params:
             db_rootpassword: { get_param: db_root_password }
             db_name: { get_param: db_name }
@@ -172,8 +172,7 @@ resources:
         - port : { get_resource: WebServerPort}
       user_data:
         str_replace:
-          template: |
-            #!/bin/bash -v
+          template: '#!/bin/bash -v
             sed -i "s/metalink=https/metalink=http/" /etc/yum.repos.d/*
             yum -y install httpd wordpress
             sed -i "/Deny from All/d" /etc/httpd/conf.d/wordpress.conf
@@ -184,6 +183,7 @@ resources:
             sed -i s/localhost/db_ipaddr/        /etc/wordpress/wp-config.php
             setenforce 0 # Otherwise net traffic with DB is disabled
             systemctl start httpd.service
+            '
           params:
             db_rootpassword: { get_param: db_root_password }
             db_name: { get_param: db_name }
@@ -221,12 +221,14 @@ resources:
       rules:
         - {port_range_max: 80, port_range_min: 80, protocol: tcp, remote_ip_prefix: 0.0.0.0/0}
         - {port_range_max: 22, port_range_min: 22, protocol: tcp, remote_ip_prefix: 0.0.0.0/0}
+        - {protocol: icmp, remote_ip_prefix: 0.0.0.0/0}
       
 outputs:
+    
   WebsiteURL:
     description: URL for Wordpress wiki
     value:
       str_replace:
         template: http://host/wordpress
         params:
-          host: { get_attr: [WebServer, networks, private, 0] }
+          host: { get_attr: [server_floating_ip, floating_ip_address] }
